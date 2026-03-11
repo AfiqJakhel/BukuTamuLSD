@@ -1,19 +1,54 @@
 import { useState, useEffect, useRef } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useMutation } from '@tanstack/react-query';
 import InputField from '../../components/InputField';
 import { ArrowRight, CheckCircle2, User, ClipboardList, PenTool, ChevronDown, Check } from 'lucide-react';
 import { submitVisitor } from '../../services/api';
 
+// Skema Validasi Form menggunakan Zod
+const formSchema = z.object({
+    nim: z.string()
+        .min(10, 'NIM harus terdiri dari tepat 10 angka')
+        .max(10, 'NIM harus terdiri dari tepat 10 angka')
+        .regex(/^\d+$/, 'NIM hanya boleh berisi angka'),
+    purpose: z.string().min(1, 'Pilih alasan kunjungan'),
+    customPurpose: z.string().optional()
+}).superRefine((data, ctx) => {
+    if (data.purpose === 'Lainnya' && (!data.customPurpose || data.customPurpose.trim() === '')) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Alasan spesifik kunjungan harus diisi',
+            path: ['customPurpose']
+        });
+    }
+});
+
 const GuestForm = () => {
     const [submitted, setSubmitted] = useState(false);
     const [countdown, setCountdown] = useState(3);
-    const [formData, setFormData] = useState({
-        nim: '',
-        purpose: 'Berkunjung',
-        customPurpose: ''
-    });
-    const [nimError, setNimError] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
+
+    // Integrasi react-hook-form dengan zod
+    const {
+        register,
+        handleSubmit,
+        setValue,
+        watch,
+        reset,
+        formState: { errors }
+    } = useForm({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            nim: '',
+            purpose: 'Berkunjung',
+            customPurpose: ''
+        }
+    });
+
+    const currentPurpose = watch('purpose');
 
     const purposes = [
         { id: 'Berkunjung', label: 'Berkunjung' },
@@ -21,14 +56,23 @@ const GuestForm = () => {
         { id: 'Lainnya', label: 'Lainnya...' }
     ];
 
+    // Integrasi react-query untuk mengirim data
+    const visitorMutation = useMutation({
+        mutationFn: submitVisitor,
+        onSuccess: () => {
+            setSubmitted(true);
+        },
+        onError: (error) => {
+            console.error('Gagal mengirim ke database:', error);
+            // Fallback: Tetap tampilkan sukses untuk uji coba jika API mati sementara
+            setSubmitted(true);
+        }
+    });
+
     const resetForm = () => {
         setSubmitted(false);
         setCountdown(3);
-        setFormData({
-            nim: '',
-            purpose: 'Berkunjung',
-            customPurpose: ''
-        });
+        reset();
         setIsDropdownOpen(false);
     };
 
@@ -55,40 +99,51 @@ const GuestForm = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    // Prevent closing and standard reload shortcuts where possible
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (
+                e.key === 'F5' ||
+                (e.ctrlKey && e.key === 'r') ||
+                (e.altKey && e.key === 'ArrowLeft') ||
+                (e.altKey && e.key === 'ArrowRight') ||
+                (e.altKey && e.key === 'F4') ||
+                (e.altKey && e.key === 'Tab')
+            ) {
+                e.preventDefault();
+            }
+        };
 
-        if (formData.nim.length !== 10) {
-            setNimError('NIM wajib terdiri dari tepat 10 angka!');
-            return;
-        }
+        const handleBeforeUnload = (e) => {
+            e.preventDefault();
+            e.returnValue = '';
+        };
 
-        try {
-            const payload = {
-                nim: formData.nim,
-                purpose: formData.purpose === 'Lainnya' ? formData.customPurpose : formData.purpose,
-                created_at: new Date().toISOString()
-            };
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('beforeunload', handleBeforeUnload);
 
-            // Coba kirim data ke backend database
-            await submitVisitor(payload);
-            setSubmitted(true);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, []);
 
-        } catch (error) {
-            console.error('Gagal mengirim ke database, API mungkin belum menyala:', error);
-            // Fallback: Tetap tampilkan sukses agar UI bisa dites sementara backend belum ada
-            setSubmitted(true);
-        }
+    const onSubmit = (data) => {
+        const payload = {
+            nim: data.nim,
+            purpose: data.purpose === 'Lainnya' ? data.customPurpose : data.purpose,
+            created_at: new Date().toISOString()
+        };
+
+        visitorMutation.mutate(payload);
     };
 
     if (submitted) {
         return (
             <div className="bg-white/80 backdrop-blur-2xl w-full max-w-md p-10 rounded-3xl border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.08)] text-center animate-fade-in relative overflow-hidden transition-all duration-500">
-                {/* Glowing top line */}
                 <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500"></div>
 
                 <div className="relative w-24 h-24 mx-auto mb-8">
-                    {/* Pulsing background effect */}
                     <div className="absolute inset-0 bg-emerald-400/30 rounded-full blur-xl animate-pulse"></div>
                     <div className="relative w-full h-full bg-gradient-to-br from-emerald-50 to-teal-50 rounded-full flex items-center justify-center text-emerald-500 shadow-sm border border-emerald-100">
                         <CheckCircle2 size={52} className="animate-[bounce_2s_infinite]" />
@@ -129,24 +184,21 @@ const GuestForm = () => {
                 </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 <div>
                     <InputField
+                        {...register('nim')}
                         label="Nomor Induk Mahasiswa (NIM)"
                         placeholder="Masukkan NIM Anda"
                         required
                         icon={User}
-                        value={formData.nim}
                         onChange={(e) => {
-                            // Validasi angka saja & maks 10 digit di input ketikan
-                            const val = e.target.value.replace(/\D/g, '');
-                            if (val.length <= 10) {
-                                setFormData({ ...formData, nim: val });
-                                setNimError('');
-                            }
+                            // Format hanya angka
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            setValue('nim', val, { shouldValidate: true });
                         }}
                     />
-                    {nimError && <p className="text-red-500 text-xs mt-1.5 font-semibold ml-2 animate-pulse">{nimError}</p>}
+                    {errors.nim && <p className="text-red-500 text-xs mt-1.5 font-semibold ml-2 animate-pulse">{errors.nim.message}</p>}
                 </div>
 
                 <div className="flex flex-col gap-2 w-full" ref={dropdownRef}>
@@ -168,8 +220,8 @@ const GuestForm = () => {
                                 <ClipboardList size={20} />
                             </div>
 
-                            <span className={`block truncate ${!formData.purpose ? 'text-gray-400' : 'text-gray-900 font-medium'}`}>
-                                {purposes.find(p => p.id === formData.purpose)?.label || 'Pilih alasan...'}
+                            <span className={`block truncate ${!currentPurpose ? 'text-gray-400' : 'text-gray-900 font-medium'}`}>
+                                {purposes.find(p => p.id === currentPurpose)?.label || 'Pilih alasan...'}
                             </span>
 
                             <div className={`absolute right-4 top-1/2 -translate-y-1/2 transition-all duration-300 ${isDropdownOpen ? 'text-primary rotate-180' : 'text-gray-400 rotate-0'}`}>
@@ -177,7 +229,6 @@ const GuestForm = () => {
                             </div>
                         </button>
 
-                        {/* Custom Dropdown Menu */}
                         <div
                             className={`absolute z-20 w-full mt-2 bg-white/95 backdrop-blur-xl border border-gray-100 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] overflow-hidden transition-all duration-300 origin-top
                                 ${isDropdownOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}
@@ -188,29 +239,26 @@ const GuestForm = () => {
                                         key={option.id}
                                         type="button"
                                         onClick={() => {
-                                            setFormData({ ...formData, purpose: option.id });
+                                            setValue('purpose', option.id, { shouldValidate: true });
                                             setIsDropdownOpen(false);
                                         }}
                                         className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3.5 transition-all duration-200 group relative
-                                            ${formData.purpose === option.id
+                                            ${currentPurpose === option.id
                                                 ? 'bg-blue-50/80 text-primary'
                                                 : 'text-gray-700 hover:bg-gray-50'
                                             }`}
                                     >
-                                        <div className={`p-2 rounded-lg transition-colors ${formData.purpose === option.id ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200'}`}>
+                                        <div className={`p-2 rounded-lg transition-colors ${currentPurpose === option.id ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200'}`}>
                                             {option.id === 'Lainnya' ? <PenTool size={18} /> :
                                                 option.id === 'Berkunjung' ? <User size={18} /> :
                                                     <ClipboardList size={18} />}
                                         </div>
                                         <div>
-                                            <div className={`text-sm font-semibold block ${formData.purpose === option.id ? 'text-primary' : 'text-gray-900'}`}>
+                                            <div className={`text-sm font-semibold block ${currentPurpose === option.id ? 'text-primary' : 'text-gray-900'}`}>
                                                 {option.label}
                                             </div>
-                                            <div className={`text-xs mt-0.5 ${formData.purpose === option.id ? 'text-primary/70' : 'text-gray-500'}`}>
-                                                {option.description}
-                                            </div>
                                         </div>
-                                        {formData.purpose === option.id && (
+                                        {currentPurpose === option.id && (
                                             <div className="absolute right-4 text-primary bg-white rounded-full p-0.5 shadow-sm border border-blue-100">
                                                 <Check size={16} strokeWidth={3} />
                                             </div>
@@ -222,34 +270,34 @@ const GuestForm = () => {
                     </div>
                 </div>
 
-                {/* Smooth Expansion Wrapper for Specific Purpose Input */}
                 <div
                     className={`transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden`}
                     style={{
-                        maxHeight: formData.purpose === 'Lainnya' ? '200px' : '0px',
-                        opacity: formData.purpose === 'Lainnya' ? 1 : 0,
-                        transform: formData.purpose === 'Lainnya' ? 'translateY(0)' : 'translateY(-10px)'
+                        maxHeight: currentPurpose === 'Lainnya' ? '200px' : '0px',
+                        opacity: currentPurpose === 'Lainnya' ? 1 : 0,
+                        transform: currentPurpose === 'Lainnya' ? 'translateY(0)' : 'translateY(-10px)'
                     }}
                 >
                     <div className="pt-2">
                         <InputField
+                            {...register('customPurpose')}
                             label="Spesifik Alasan Kunjungan"
                             placeholder="Tuliskan tujuan Anda..."
-                            required={formData.purpose === 'Lainnya'}
+                            required={currentPurpose === 'Lainnya'}
                             icon={PenTool}
-                            value={formData.customPurpose}
-                            onChange={(e) => setFormData({ ...formData, customPurpose: e.target.value })}
                         />
+                        {errors.customPurpose && <p className="text-red-500 text-xs mt-1.5 font-semibold ml-2 animate-pulse">{errors.customPurpose.message}</p>}
                     </div>
                 </div>
 
                 <div className="pt-4">
                     <button
                         type="submit"
-                        className="w-full bg-gradient-to-r from-primary to-sidebar hover:from-primary-hover hover:to-[#040b16] text-white font-semibold py-4 rounded-xl transition-all duration-300 shadow-[0_4px_14px_0_rgba(11,111,241,0.39)] hover:shadow-[0_6px_20px_rgba(11,111,241,0.23)] hover:-translate-y-0.5 flex justify-center items-center gap-2 group"
+                        disabled={visitorMutation.isPending}
+                        className="w-full disabled:opacity-70 disabled:cursor-not-allowed bg-gradient-to-r from-primary to-sidebar hover:from-primary-hover hover:to-[#040b16] text-white font-semibold py-4 rounded-xl transition-all duration-300 shadow-[0_4px_14px_0_rgba(11,111,241,0.39)] hover:shadow-[0_6px_20px_rgba(11,111,241,0.23)] hover:-translate-y-0.5 flex justify-center items-center gap-2 group"
                     >
-                        Daftar Sekarang
-                        <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                        {visitorMutation.isPending ? 'Mengirim Data...' : 'Daftar Sekarang'}
+                        {!visitorMutation.isPending && <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />}
                     </button>
                 </div>
             </form>

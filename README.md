@@ -13,3 +13,13 @@ Terminal 1 FrontEnd : ".../BukuTamuLSD"
 Terminal 2 BackEnd : ".../BukuTamuLSD/backend"
 
 Pastikan Terminal mengarah ke file tersebut
+
+# Untuk mengisi data dummy
+masuk ke terminal backend dan jalankan perintah "node seed.js" 
+
+# Untuk isi dari env sendiri
+PORT=8000
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=
+DB_NAME= {nama database}

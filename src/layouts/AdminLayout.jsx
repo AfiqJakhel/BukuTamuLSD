@@ -8,9 +8,9 @@ const AdminLayout = () => {
     const getPageTitle = () => {
         switch (location.pathname) {
             case '/':
-                return { title: 'Dashboard', subtitle: 'Ringkasan data pengunjung laboratorium hari ini' };
+                return { title: 'Dashboard', subtitle: 'Grafik dan statistik pengunjung Laboratorium Sistem Development' };
             case '/visitors':
-                return { title: 'Data Pengunjung', subtitle: 'Kelola seluruh daftar pengunjung dengan mudah' };
+                return { title: 'Data Pengunjung', subtitle: 'Lihat seluruh data pengunjung Laboratorium Sistem Development' };
             default:
                 return { title: 'Admin Panel', subtitle: 'Halaman Administrasi Buku Tamu Lab' };
         }
@@ -19,7 +19,7 @@ const AdminLayout = () => {
     const { title, subtitle } = getPageTitle();
 
     return (
-        <div className="flex min-h-screen bg-gray-50 font-sans text-gray-900">
+        <div className="flex min-h-screen bg-transparent font-sans text-gray-900">
             <Sidebar />
             <div className="flex-1 ml-72 flex flex-col min-h-screen">
                 <Navbar title={title} subtitle={subtitle} />

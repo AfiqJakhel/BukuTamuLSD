@@ -30,14 +30,35 @@ export const parseNIM = (nim) => {
         14: 'Kedokteran Gigi', 15: 'Teknologi Informasi'
     };
 
-    // Pemetaan Program Studi Khusus (Sesuai Konteks TI yang diminta)
+    // Pemetaan Program Studi Khusus dan Eksternal
+    const eksternalProdiMap = {
+        1: { 1: 'Ilmu Hukum' },
+        2: { 1: 'Agroteknologi', 2: 'Agribisnis', 3: 'Ilmu Tanah', 4: 'Proteksi Tanaman', 5: 'Penyuluhan Pertanian' },
+        3: { 1: 'Pendidikan Dokter', 2: 'Psikologi', 3: 'Kebidanan', 4: 'Ilmu Biomedis' },
+        4: { 1: 'Kimia', 2: 'Biologi', 3: 'Matematika', 4: 'Fisika' },
+        5: { 1: 'Ilmu Ekonomi', 2: 'Manajemen', 3: 'Akuntansi' },
+        6: { 1: 'Peternakan' },
+        7: { 1: 'Ilmu Sejarah', 2: 'Sastra Indonesia', 3: 'Sastra Inggris', 4: 'Sastra Minangkabau', 5: 'Sastra Jepang' },
+        8: { 1: 'Sosiologi', 2: 'Antropologi', 3: 'Ilmu Politik', 4: 'Administrasi Publik', 5: 'Hubungan Internasional', 6: 'Ilmu Komunikasi' },
+        9: { 1: 'Teknik Mesin', 2: 'Teknik Sipil', 3: 'Teknik Industri', 4: 'Teknik Lingkungan', 5: 'Teknik Elektro' },
+        10: { 1: 'Farmasi' },
+        11: { 1: 'Teknik Pertanian dan Biosistem', 2: 'Teknologi Hasil Pertanian', 3: 'Teknologi Industri Pertanian' },
+        12: { 1: 'Ilmu Kesehatan Masyarakat', 2: 'Ilmu Gizi' },
+        13: { 1: 'Ilmu Keperawatan' },
+        14: { 1: 'Kedokteran Gigi' }
+    };
+
     let prodiName = `Prodi Kode ${prodiCode}`;
     if (fakultasCode === 15) {
         if (prodiCode === 1) prodiName = 'Teknik Komputer';
         else if (prodiCode === 2) prodiName = 'Sistem Informasi';
         else if (prodiCode === 3) prodiName = 'Informatika';
     } else {
-        prodiName = `Eksternal FTI`; // Label default fakultas lain
+        if (eksternalProdiMap[fakultasCode] && eksternalProdiMap[fakultasCode][prodiCode]) {
+            prodiName = eksternalProdiMap[fakultasCode][prodiCode];
+        } else {
+            prodiName = fakultasMap[fakultasCode] || 'Eksternal';
+        }
     }
 
     // Pemetaan Jalur Masuk
