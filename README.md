@@ -3,8 +3,8 @@ untuk pennggunaan silahkan tekan windows + r  setelah menghidupkan server
 
 # Penting
 lalu masukkan code : msedge --kiosk http://localhost:5173/guest --edge-kiosk-type=fullscreen 
-untuk keluar dar form pendataan tamu tekan esc dan masukkan password admin123 
-untuk keluar dari fullscreen sistem silahkan tekan alt + f4 
+untuk keluar dar form pendataan tamu tekan esc dan masukkan password lsdimoep 
+untuk keluar dari fullscreen sistem silahkan tekan alt + f4 dan itu cuma bisa di halaman dashboard jika d halaman buku tamu tidak bisa 
 
 sebelum menggunakan aplikasi ini pastikan server sudah berjalan dengan menggunakan perintah "npm run dev" 
 selalu buat 2 terminal untuk menjalankan aplikasi ini 
