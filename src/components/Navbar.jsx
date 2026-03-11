@@ -19,9 +19,9 @@ const Navbar = ({ title, subtitle }) => {
 
                 <div className="flex items-center gap-3 pl-2 cursor-pointer group">
                     <div className="w-10 h-10 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold text-sm ring-2 ring-transparent group-hover:ring-blue-300 transition-all">
-                        AD
+                        LSD
                     </div>
-                    <span className="font-medium text-sm text-gray-700">Admin Lab</span>
+                    <span className="font-medium text-sm text-gray-700">Laboratorium System Development</span>
                 </div>
             </div>
         </header>
