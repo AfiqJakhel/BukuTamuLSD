@@ -5,7 +5,8 @@ import { fetchVisitors } from '../../services/api';
 import { parseNIM } from '../../utils/nimParser';
 import { format, isSameWeek, subWeeks, isSameMonth, subMonths, isSameYear } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { Download, ChevronLeft, ChevronRight, Filter, ChevronDown, Check } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, Filter, ChevronDown, Check, ClipboardList, Users } from 'lucide-react';
+import EmptyState from '../../components/EmptyState';
 
 const Visitors = () => {
     const { data: visitors = [], isLoading } = useQuery({
@@ -179,10 +180,20 @@ const Visitors = () => {
                     <tr>
                         <td colSpan="4" className="py-8 text-center text-gray-500">Memuat data pengunjung...</td>
                     </tr>
+                ) : visitors.length === 0 ? (
+                    <EmptyState
+                        variant="table"
+                        icon={Users}
+                        title="Belum Ada Pengunjung"
+                        description="Data pengunjung lab akan otomatis muncul di sini setelah ada tamu yang mengisi buku tamu."
+                    />
                 ) : filteredVisitors.length === 0 ? (
-                    <tr>
-                        <td colSpan="4" className="py-8 text-center text-gray-500">Belum ada data kunjungan pada periode ini.</td>
-                    </tr>
+                    <EmptyState
+                        variant="table"
+                        icon={ClipboardList}
+                        title="Tidak Ada Data Periode Ini"
+                        description={`Belum ada kunjungan pada filter "${filterOptions.find(o => o.id === timeFilter)?.label}". Coba pilih periode lain.`}
+                    />
                 ) : (
                     currentItems.map((visitor) => {
                         const parsed = parseNIM(visitor.nim);

@@ -20,7 +20,6 @@ const InputField = forwardRef(({ label, type = 'text', placeholder, value, onCha
                     placeholder={placeholder}
                     value={value}
                     onChange={onChange}
-                    required={required}
                     className={`w-full ${Icon ? 'pl-11' : 'pl-4'} pr-4 py-3.5 bg-gray-50/50 hover:bg-gray-50 border border-gray-200 rounded-xl text-sm transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white placeholder-gray-400 shadow-sm`}
                     {...props}
                 />

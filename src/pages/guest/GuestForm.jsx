@@ -4,14 +4,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import InputField from '../../components/InputField';
-import { ArrowRight, CheckCircle2, User, ClipboardList, PenTool, ChevronDown, Check } from 'lucide-react';
+import { ArrowRight, CheckCircle2, User, ClipboardList, PenTool, ChevronDown, Check, AlertCircle, ShieldAlert } from 'lucide-react';
 import { submitVisitor } from '../../services/api';
 
 // Skema Validasi Form menggunakan Zod
 const formSchema = z.object({
     nim: z.string()
-        .min(10, 'NIM harus terdiri dari tepat 10 angka')
-        .max(10, 'NIM harus terdiri dari tepat 10 angka')
+        .min(10, 'NIM harus terdiri dari 10 angka')
+        .max(10, 'NIM harus terdiri dari 10 angka')
         .regex(/^\d+$/, 'NIM hanya boleh berisi angka'),
     purpose: z.string().min(1, 'Pilih alasan kunjungan'),
     customPurpose: z.string().optional()
@@ -29,7 +29,11 @@ const GuestForm = () => {
     const [submitted, setSubmitted] = useState(false);
     const [countdown, setCountdown] = useState(3);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [shake, setShake] = useState(false);
+    const [showError, setShowError] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
     const dropdownRef = useRef(null);
+    const errorTimeoutRef = useRef(null);
 
     // Integrasi react-hook-form dengan zod
     const {
@@ -38,9 +42,10 @@ const GuestForm = () => {
         setValue,
         watch,
         reset,
-        formState: { errors }
+        formState: { errors, touchedFields, isSubmitted }
     } = useForm({
         resolver: zodResolver(formSchema),
+        mode: 'onSubmit',
         defaultValues: {
             nim: '',
             purpose: 'Berkunjung',
@@ -61,11 +66,18 @@ const GuestForm = () => {
         mutationFn: submitVisitor,
         onSuccess: () => {
             setSubmitted(true);
+            // Pastikan semua error bersih total saat sukses
+            setShowError(false);
+            setErrorMessage('');
+            setShake(false);
+            if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
         },
         onError: (error) => {
             console.error('Gagal mengirim ke database:', error);
-            // Fallback: Tetap tampilkan sukses untuk uji coba jika API mati sementara
+            // Tetap anggap sukses untuk demo jika API mati
             setSubmitted(true);
+            setShowError(false);
+            setErrorMessage('');
         }
     });
 
@@ -74,6 +86,8 @@ const GuestForm = () => {
         setCountdown(3);
         reset();
         setIsDropdownOpen(false);
+        setShowError(false);
+        setShake(false);
     };
 
     useEffect(() => {
@@ -129,6 +143,12 @@ const GuestForm = () => {
     }, []);
 
     const onSubmit = (data) => {
+        // Clear any pending error timeouts and hide banner immediately
+        if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+        setShowError(false);
+        setShake(false);
+        setErrorMessage('');
+        
         const payload = {
             nim: data.nim,
             purpose: data.purpose === 'Lainnya' ? data.customPurpose : data.purpose,
@@ -136,6 +156,27 @@ const GuestForm = () => {
         };
 
         visitorMutation.mutate(payload);
+    };
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+        };
+    }, []);
+
+    const onError = (errors) => {
+        // Trigger shake
+        setShake(true);
+        setTimeout(() => setShake(false), 200);
+
+        // Show banner
+        const firstError = Object.values(errors)[0];
+        setErrorMessage(firstError?.message || 'Lengkapi data Anda');
+        setShowError(true);
+        
+        if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+        errorTimeoutRef.current = setTimeout(() => setShowError(false), 3000);
     };
 
     if (submitted) {
@@ -172,8 +213,19 @@ const GuestForm = () => {
     }
 
     return (
-        <div className="bg-white/80 backdrop-blur-2xl w-full max-w-xl p-8 md:p-10 rounded-3xl border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-all duration-500 animate-fade-in relative z-10">
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-primary via-blue-500 to-sidebar rounded-t-3xl"></div>
+        <div className={`bg-white/80 backdrop-blur-2xl w-full max-w-xl p-8 md:p-10 rounded-3xl border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-all duration-500 animate-fade-in relative z-10 ${shake ? 'animate-[headShake_0.5s_ease-in-out]' : ''}`}>
+            
+            {/* Error Banner - hanya render jika sedang tidak sukses/loading */}
+            {!submitted && !visitorMutation.isPending && showError && errorMessage && (
+                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 w-[90%] transition-all duration-300 z-50 ${showError ? 'opacity-100 -translate-y-full' : 'opacity-0 -translate-y-1/2 pointer-events-none'}`}>
+                    <div className="bg-red-500 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 border border-red-400">
+                        <ShieldAlert size={20} className="shrink-0" />
+                        <span className="text-sm font-bold truncate">{errorMessage}</span>
+                    </div>
+                </div>
+            )}
+
+            <div className={`absolute top-0 left-0 w-full h-1.5 rounded-t-3xl transition-colors duration-500 ${!submitted && showError ? 'bg-red-500' : 'bg-gradient-to-r from-primary via-blue-500 to-sidebar'}`}></div>
 
             <div className="mb-10 mt-2">
                 <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 mb-3 tracking-tight text-center">
@@ -184,7 +236,7 @@ const GuestForm = () => {
                 </p>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit, onError)} noValidate className="space-y-6">
                 <div>
                     <InputField
                         {...register('nim')}
@@ -195,10 +247,9 @@ const GuestForm = () => {
                         onChange={(e) => {
                             // Format hanya angka
                             const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                            setValue('nim', val, { shouldValidate: true });
+                            setValue('nim', val, { shouldValidate: isSubmitted });
                         }}
                     />
-                    {errors.nim && <p className="text-red-500 text-xs mt-1.5 font-semibold ml-2 animate-pulse">{errors.nim.message}</p>}
                 </div>
 
                 <div className="flex flex-col gap-2 w-full" ref={dropdownRef}>
@@ -286,7 +337,12 @@ const GuestForm = () => {
                             required={currentPurpose === 'Lainnya'}
                             icon={PenTool}
                         />
-                        {errors.customPurpose && <p className="text-red-500 text-xs mt-1.5 font-semibold ml-2 animate-pulse">{errors.customPurpose.message}</p>}
+                        {isSubmitted && errors.customPurpose && (
+                            <div className="flex items-center gap-1.5 mt-2 ml-1 text-red-500 animate-fade-in">
+                                <AlertCircle size={14} />
+                                <p className="text-xs font-semibold">{errors.customPurpose.message}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -296,7 +352,7 @@ const GuestForm = () => {
                         disabled={visitorMutation.isPending}
                         className="w-full disabled:opacity-70 disabled:cursor-not-allowed bg-gradient-to-r from-primary to-sidebar hover:from-primary-hover hover:to-[#040b16] text-white font-semibold py-4 rounded-xl transition-all duration-300 shadow-[0_4px_14px_0_rgba(11,111,241,0.39)] hover:shadow-[0_6px_20px_rgba(11,111,241,0.23)] hover:-translate-y-0.5 flex justify-center items-center gap-2 group"
                     >
-                        {visitorMutation.isPending ? 'Mengirim Data...' : 'Daftar Sekarang'}
+                        {visitorMutation.isPending ? 'Mengirim Data...' : 'Check-In'}
                         {!visitorMutation.isPending && <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />}
                     </button>
                 </div>

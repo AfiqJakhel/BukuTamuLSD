@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Users, UserPlus, Clock, ArrowUpRight, ArrowDownRight, Calendar, Activity, Filter, ChevronDown, Check } from 'lucide-react';
+import { Users, UserPlus, Clock, ArrowUpRight, ArrowDownRight, Calendar, Activity, Filter, ChevronDown, Check, BarChart3 } from 'lucide-react';
+import EmptyState from '../../components/EmptyState';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { fetchVisitors } from '../../services/api';
@@ -208,6 +209,47 @@ const Dashboard = () => {
             <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
                 <Activity size={40} className="text-primary animate-pulse w-10 h-10" />
                 <p className="text-gray-500 font-medium">Memuat data dashboard...</p>
+            </div>
+        );
+    }
+
+    // Empty state ketika belum ada data pengunjung sama sekali
+    if (visitors.length === 0) {
+        const emptyStatData = [
+            { title: 'Pengunjung Hari Ini', value: '-', icon: <UserPlus size={24} className="text-emerald-500" />, bgIcon: 'bg-emerald-100' },
+            { title: 'Pengunjung Mgg Ini', value: '-', icon: <Users size={24} className="text-blue-500" />, bgIcon: 'bg-blue-100' },
+            { title: 'Pengunjung Bln Ini', value: '-', icon: <Calendar size={24} className="text-purple-500" />, bgIcon: 'bg-purple-100' },
+            { title: 'Jam Sibuk', value: '-', icon: <Clock size={24} className="text-amber-500" />, bgIcon: 'bg-amber-100' },
+        ];
+        return (
+            <div className="space-y-8 max-w-7xl mx-auto animate-fade-in">
+                {/* Stats cards with empty dashes */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {emptyStatData.map((stat, i) => (
+                        <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md transition-shadow">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gray-200"></div>
+                            <div className="flex justify-between items-center mb-4">
+                                <span className="text-gray-500 text-sm font-medium">{stat.title}</span>
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${stat.bgIcon} opacity-50`}>
+                                    {stat.icon}
+                                </div>
+                            </div>
+                            <div className="flex items-end gap-3">
+                                <h3 className="text-3xl font-bold text-gray-300">{stat.value}</h3>
+                                <span className="text-xs text-gray-300 font-medium mb-1">Belum ada data</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Full empty state illustration */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+                    <EmptyState
+                        icon={BarChart3}
+                        title="Dashboard Masih Kosong"
+                        description="Belum ada data pengunjung yang tercatat. Statistik dan grafik kunjungan akan otomatis muncul setelah tamu pertama mengisi buku tamu lab."
+                    />
+                </div>
             </div>
         );
     }
