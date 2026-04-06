@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Users, UserPlus, Clock, ArrowUpRight, ArrowDownRight, Calendar, Activity, Filter, ChevronDown, Check, BarChart3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Users, UserPlus, Clock, ArrowUpRight, ArrowDownRight, Calendar, Activity, Filter, ChevronDown, Check, BarChart3, ExternalLink, ArrowRight } from 'lucide-react';
 import EmptyState from '../../components/EmptyState';
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { fetchVisitors } from '../../services/api';
 import { parseNIM } from '../../utils/nimParser';
@@ -14,6 +15,7 @@ import {
 } from 'date-fns';
 
 const Dashboard = () => {
+    const navigate = useNavigate();
     const [chartFilter, setChartFilter] = useState('this_week');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -53,7 +55,8 @@ const Dashboard = () => {
     let visitorsLastWeek = 0;
     let visitorsThisMonth = 0;
     let visitorsLastMonth = 0;
-    const hourlyCounts = {};
+    const hourlyCounts = {}; // untuk semua data (tidak terpakai di card lagi)
+    const thisWeekHourlyCounts = {}; // untuk kalkulasi Jam Sibuk minggu ini
     const angkatanCounts = {};
     const jurusanCounts = {};
 
@@ -94,9 +97,14 @@ const Dashboard = () => {
         if (isSameMonth(visitDate, today)) visitorsThisMonth++;
         if (isSameMonth(visitDate, lastMonthDate)) visitorsLastMonth++;
 
-        // Jam Sibuk
+        // Jam Sibuk (hitung semua untuk referensi)
         const hour = getHours(visitDate);
         hourlyCounts[hour] = (hourlyCounts[hour] || 0) + 1;
+
+        // Jam Sibuk minggu ini
+        if (isSameWeek(visitDate, today, { weekStartsOn: 1 })) {
+            thisWeekHourlyCounts[hour] = (thisWeekHourlyCounts[hour] || 0) + 1;
+        }
 
         // Distribusi Angkatan dan Jurusan
         const parsed = parseNIM(visitor.nim);
@@ -131,32 +139,22 @@ const Dashboard = () => {
         ];
     }
 
-    // Mencari Jam Sibuk
-    let peakHour = 'N/A';
+    // Mencari Jam Sibuk minggu ini (modus jam masuk)
+    let peakHour = '–';
     let maxCount = 0;
-    Object.keys(hourlyCounts).forEach(hour => {
-        if (hourlyCounts[hour] > maxCount) {
-            maxCount = hourlyCounts[hour];
+    Object.keys(thisWeekHourlyCounts).forEach(hour => {
+        if (thisWeekHourlyCounts[hour] > maxCount) {
+            maxCount = thisWeekHourlyCounts[hour];
             peakHour = `${String(hour).padStart(2, '0')}:00`;
         }
     });
 
-    const hourlyDistributionData = Object.keys(hourlyCounts).map(key => ({ 
-        name: `${String(key).padStart(2, '0')}:00`, 
-        visitors: hourlyCounts[key] 
-    })).sort((a, b) => parseInt(a.name) - parseInt(b.name));
+    // 5 Pengunjung Terakhir (diurutkan descending berdasarkan created_at)
+    const latestVisitors = [...visitors]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 5);
 
-    const angkatanData = Object.keys(angkatanCounts).map(key => ({ 
-        name: key, 
-        value: angkatanCounts[key] 
-    })).sort((a,b) => b.value - a.value).slice(0, 6); // Ambil Top 6 terbesar
 
-    const jurusanData = Object.keys(jurusanCounts).map(key => ({ 
-        name: key, 
-        value: jurusanCounts[key] 
-    })).sort((a,b) => b.value - a.value).slice(0, 6);
-
-    const COLORS = ['#0b74f1', '#14b8a6', '#f59e0b', '#ec4899', '#8b5cf6', '#6366f1'];
 
     const calculateTrend = (current, previous) => {
         if (previous === 0) return current > 0 ? 100 : 0;
@@ -200,7 +198,8 @@ const Dashboard = () => {
             value: peakHour,
             isNeutral: true,
             icon: <Clock size={24} className="text-amber-500" />,
-            bgIcon: 'bg-amber-100'
+            bgIcon: 'bg-amber-100',
+            subtitle: 'Jam tersibuk minggu ini'
         }
     ];
 
@@ -270,7 +269,7 @@ const Dashboard = () => {
                         <div className="flex items-end gap-3">
                             <h3 className="text-3xl font-bold text-gray-900">{stat.value}</h3>
                             {stat.subtitle && (
-                                <div className={`flex items-center text-sm font-semibold mb-1 ${stat.isNeutral ? 'text-gray-500' : (stat.trendUp ? 'text-emerald-500' : 'text-red-500')}`}>
+                                <div className={`flex items-center text-sm font-semibold mb-1 ${stat.isNeutral ? 'text-gray-400' : (stat.trendUp ? 'text-emerald-500' : 'text-red-500')}`}>
                                     {!stat.isNeutral && (stat.trendUp ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />)}
                                     <span>{stat.subtitle}</span>
                                 </div>
@@ -379,65 +378,77 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* Additional Analytics Charts Layer */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[400px]">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Distribusi Jam</h3>
-                    <p className="text-xs text-gray-500 mb-6">Waktu favorit kunjungan ke lab</p>
-                    <div className="flex-1 w-full min-h-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={hourlyDistributionData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} allowDecimals={false} />
-                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} cursor={{fill: '#f3f4f6'}} />
-                                <Bar dataKey="visitors" fill="#0b74f1" radius={[4, 4, 0, 0]} barSize={25} />
-                            </BarChart>
-                        </ResponsiveContainer>
+            {/* 5 Data Pengunjung Terakhir */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 pb-6">
+                <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-900">5 Data Pengunjung Terakhir</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">Kunjungan terbaru yang tercatat di sistem</p>
                     </div>
                 </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[400px]">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Top Angkatan</h3>
-                    <p className="text-xs text-gray-500 mb-6">Distribusi berdasarkan tahun angkatan</p>
-                    <div className="flex-1 w-full min-h-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={angkatanData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={55}
-                                    outerRadius={95}
-                                    paddingAngle={5}
-                                    dataKey="value"
-                                >
-                                    {angkatanData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <div className="overflow-x-auto">
+                    {latestVisitors.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                            <Users size={36} className="mb-3 opacity-30" />
+                            <p className="text-sm font-medium">Belum ada data pengunjung</p>
+                        </div>
+                    ) : (
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-gray-100">
+                                    {['No', 'NIM', 'Angkatan', 'Keperluan', 'Tanggal Masuk', 'Jam Masuk', ''].map((col) => (
+                                        <th
+                                            key={col}
+                                            className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap"
+                                        >
+                                            {col}
+                                        </th>
                                     ))}
-                                </Pie>
-                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {latestVisitors.map((visitor, index) => {
+                                    const parsed = parseNIM(visitor.nim);
+                                    const visitDate = new Date(visitor.created_at);
+                                    const tanggalMasuk = visitDate.toLocaleDateString('id-ID', {
+                                        weekday: 'long',
+                                        day: '2-digit',
+                                        month: 'long',
+                                        year: 'numeric',
+                                    });
+                                    const jamMasuk = visitDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                                    return (
+                                        <tr key={visitor.id || index} className="hover:bg-gray-50/70 transition-colors">
+                                            <td className="px-6 py-4 text-gray-400 font-medium w-12">{index + 1}</td>
+                                            <td className="px-6 py-4 text-gray-700 font-mono text-xs whitespace-nowrap">{visitor.nim}</td>
+                                            <td className="px-6 py-4 w-28">
+                                                <span className="inline-block bg-purple-50 text-purple-600 text-xs font-semibold px-2.5 py-1 rounded-lg">
+                                                    {parsed?.angkatan ?? '–'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-600 max-w-[200px] truncate" title={visitor.purpose}>
+                                                {visitor.purpose}
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-700 whitespace-nowrap">{tanggalMasuk}</td>
+                                            <td className="px-6 py-4 text-gray-700 font-semibold whitespace-nowrap">{jamMasuk} WIB</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[400px]">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Top Jurusan</h3>
-                    <p className="text-xs text-gray-500 mb-6">Program studi pengunjung terbanyak</p>
-                    <div className="flex-1 w-full min-h-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={jurusanData} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e5e7eb" />
-                                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} allowDecimals={false} />
-                                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} width={90} />
-                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} cursor={{fill: '#f3f4f6'}} />
-                                <Bar dataKey="value" fill="#14b8a6" radius={[0, 4, 4, 0]} barSize={20} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                {latestVisitors.length > 0 && (
+                    <div className="px-6 pt-4 border-t border-gray-100 flex justify-end">
+                        <button
+                            onClick={() => navigate('/visitors')}
+                            className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-white bg-blue-50 hover:bg-primary px-4 py-2 rounded-xl border border-blue-100 hover:border-primary transition-all duration-200 group"
+                        >
+                            Lihat Semua Data Pengunjung
+                            <ArrowRight size={15} className="transition-transform duration-200 group-hover:translate-x-1" />
+                        </button>
                     </div>
-                </div>
+                )}
             </div>
 
         </div>

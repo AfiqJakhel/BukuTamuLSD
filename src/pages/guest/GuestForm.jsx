@@ -7,7 +7,6 @@ import InputField from '../../components/InputField';
 import { ArrowRight, CheckCircle2, User, ClipboardList, PenTool, ChevronDown, Check, AlertCircle, ShieldAlert } from 'lucide-react';
 import { submitVisitor } from '../../services/api';
 
-// Skema Validasi Form menggunakan Zod
 const formSchema = z.object({
     nim: z.string()
         .min(10, 'NIM harus terdiri dari 10 angka')
